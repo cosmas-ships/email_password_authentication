@@ -1,15 +1,5 @@
 # These are supported funding model platforms
 
 github: [cosmascodes] # Your GitHub username if you’re in the GitHub Sponsors program
-patreon: neuracreations
-open_collective: neuracreations
-ko_fi: neuracreations
-tidelift: npm/neuracreations
-community_bridge: cloud-foundry
-liberapay: neuracreations
-issuehunt: neuracreations
-lfx_crowdfunding: cloud-foundry
-polar: neuracreations
 buy_me_a_coffee: cosmascodes
-thanks_dev: neuracreations
-custom: ['https://neuracreations.com/support', 'https://buymeacoffee.com/cosmascodes']
+
