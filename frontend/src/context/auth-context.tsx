@@ -25,10 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
+
+  // Ensure client-side only rendering
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Initialize on mount
   useEffect(() => {
+    if (!mounted) return
+
     const initialize = async () => {
       try {
         const res = await fetch("/api/auth/me")
@@ -46,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     initialize()
-  }, [])
+  }, [mounted])
 
   const login = async (email: string, password: string) => {
     const res = await fetch("/api/auth/login", {
@@ -58,8 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error("Invalid login")
     const data = await res.json()
 
-    document.cookie = `accessToken=${data.access_token}; path=/`
-    document.cookie = `refreshToken=${data.refresh_token}; path=/`
+    document.cookie = `accessToken=${data.access_token}; path=/; secure; samesite=strict`
+    document.cookie = `refreshToken=${data.refresh_token}; path=/; secure; samesite=strict`
 
     const me = await fetch("/api/auth/me")
     const userData = await me.json()
@@ -77,8 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error("Registration failed")
 
     const data = await res.json()
-    document.cookie = `accessToken=${data.access_token}; path=/`
-    document.cookie = `refreshToken=${data.refresh_token}; path=/`
+    document.cookie = `accessToken=${data.access_token}; path=/; secure; samesite=strict`
+    document.cookie = `refreshToken=${data.refresh_token}; path=/; secure; samesite=strict`
 
     const me = await fetch("/api/auth/me")
     const userData = await me.json()
@@ -104,11 +112,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch("/api/auth/refresh", { method: "POST" })
     if (res.ok) {
       const data = await res.json()
-      document.cookie = `accessToken=${data.access_token}; path=/`
-      document.cookie = `refreshToken=${data.refresh_token}; path=/`
+      document.cookie = `accessToken=${data.access_token}; path=/; secure; samesite=strict`
+      document.cookie = `refreshToken=${data.refresh_token}; path=/; secure; samesite=strict`
     } else {
       await logout()
     }
+  }
+
+  // Prevent hydration mismatch by rendering placeholder during SSR
+  if (!mounted) {
+    return (
+      <AuthContext.Provider
+        value={{
+          user: null,
+          isAuthenticated: false,
+          isLoading: true,
+          login: async () => {},
+          register: async () => {},
+          logout: async () => {},
+          refreshAccessToken: async () => {},
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    )
   }
 
   return (
