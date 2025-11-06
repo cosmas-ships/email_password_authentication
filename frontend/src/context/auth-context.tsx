@@ -61,6 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             "/auth/login",
             "/auth/register",
             "/auth/verify-email",
+            "/login",      // Add aliases
+            "/signin",
+            "/register",
+            "/signup",
           ];
 
           if (!publicRoutes.includes(pathname)) {
@@ -159,6 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "/auth/login",
         "/auth/register",
         "/auth/verify-email",
+        "/login",
+        "/signin",
+        "/register",
+        "/signup",
       ];
       if (!publicRoutes.includes(pathname)) {
         router.replace("/auth/login");

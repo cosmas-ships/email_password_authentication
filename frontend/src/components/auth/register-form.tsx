@@ -67,7 +67,7 @@ export function RegisterForm() {
         throw new Error(data.error || "Verification failed")
       }
 
-      router.push("/dashboard")
+      router.replace("/dashboard")
     } catch (err) {
       setVerifyError(err instanceof Error ? err.message : "Verification failed")
     } finally {
