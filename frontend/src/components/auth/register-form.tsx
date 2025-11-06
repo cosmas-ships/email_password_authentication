@@ -12,12 +12,16 @@ import { useAuth } from "@/context/auth-context"
 
 export function RegisterForm() {
   const router = useRouter()
-  const { register, isLoading } = useAuth()
+  const { register, verifyEmail, isLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [registrationStep, setRegistrationStep] = useState<"register" | "verify">("register")
+  const [verificationCode, setVerificationCode] = useState("")
+  const [verifyError, setVerifyError] = useState("")
+  const [isVerifying, setIsVerifying] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,11 +42,55 @@ export function RegisterForm() {
 
     try {
       await register(email, password)
-      router.replace("/dashboard")
+      setRegistrationStep("verify")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setVerifyError("")
+    setIsVerifying(true)
+
+    try {
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: verificationCode }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed")
+      }
+
+      router.push("/dashboard")
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Verification failed")
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    setVerifyError("")
+    try {
+      const response = await fetch("/api/auth/resend-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to resend code")
+      }
+      setVerifyError("") // Clear error on success
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Failed to resend verification code")
     }
   }
 
@@ -51,6 +99,72 @@ export function RegisterForm() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
+    )
+  }
+
+  if (registrationStep === "verify") {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl">Verify Email</CardTitle>
+          <CardDescription>We've sent a verification code to {email}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleVerifyEmail} className="space-y-4">
+            {verifyError && (
+              <Alert variant="destructive">
+                <AlertDescription>{verifyError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <label htmlFor="code" className="text-sm font-medium">
+                Verification Code
+              </label>
+              <Input
+                id="code"
+                type="text"
+                placeholder="Enter 6-digit code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+                disabled={isVerifying}
+                required
+                maxLength={6}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isVerifying}>
+              {isVerifying ? "Verifying..." : "Verify Email"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full bg-transparent"
+              onClick={handleResendCode}
+              disabled={isVerifying}
+            >
+              Didn't receive a code? Resend
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setRegistrationStep("register")
+                setEmail("")
+                setPassword("")
+                setConfirmPassword("")
+                setError("")
+              }}
+              className="text-primary hover:underline font-medium"
+            >
+              Back to registration
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -77,7 +191,7 @@ export function RegisterForm() {
               type="email"
               placeholder="name@example.com"
               value={email}
-              onChange={(e: { target: { value: React.SetStateAction<string> } }) => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isSubmitting}
               required
             />
@@ -92,7 +206,7 @@ export function RegisterForm() {
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={(e: { target: { value: React.SetStateAction<string> } }) => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               disabled={isSubmitting}
               required
             />
@@ -107,7 +221,7 @@ export function RegisterForm() {
               type="password"
               placeholder="••••••••"
               value={confirmPassword}
-              onChange={(e: { target: { value: React.SetStateAction<string> } }) => setConfirmPassword(e.target.value)}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isSubmitting}
               required
             />

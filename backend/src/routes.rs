@@ -8,10 +8,11 @@ use axum::{
 pub fn create_router(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/register", post(auth::register))
+        .route("/verify-email", post(auth::verify_email))
+        .route("/resend-code", post(auth::resend_verification_code))
         .route("/login", post(auth::login))
         .route("/refresh", post(auth::refresh))
-        .route("/logout", post(auth::logout))
-        .route("/sessions", post(auth::get_active_sessions)); // New route
+        .route("/logout", post(auth::logout));
 
     let protected_routes = Router::new()
         .route("/me", get(auth::me))

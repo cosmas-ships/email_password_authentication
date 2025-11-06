@@ -138,3 +138,19 @@ pub struct ActiveSessionsResponse {
 pub struct CheckSessionsRequest {
     pub access_token: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyEmailRequest {
+    pub email: String,
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResendCodeRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MessageResponse {
+    pub message: String,
+}

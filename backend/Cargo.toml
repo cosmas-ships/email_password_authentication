@@ -21,6 +21,7 @@ redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 argon2 = "0.5"
 jsonwebtoken = "9"
 rand = "0.8"
+sha2 = "0.10.9"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -46,10 +47,13 @@ dotenvy = "0.15"
 # Validation
 validator = { version = "0.16", features = ["derive"] }
 
-# HTTP
+# HTTP & Requests
 http = "1.0"
+reqwest = { version = "0.12", features = ["json", "default-tls"] }
 
 # Cookies
 tower-cookies = "0.10"
 axum-extra = { version = "0.9", features = ["cookie"] }
-sha2 = "0.10.9"
+
+# Email (optional, for fallback or direct SMTP)
+lettre = { version = "0.11", features = ["builder", "tokio1-native-tls", "smtp-transport"] }

@@ -11,13 +11,21 @@ mod services {
     pub mod password;
     pub mod token;
     pub mod users;
+    pub mod email;         // ✅ Added for email sending
+    pub mod verification;  // ✅ Added for email verification logic
 }
 mod state;
 
 use config::Config;
 use redis::aio::ConnectionManager;
 use routes::create_router;
-use services::{jwt::JwtService, token::TokenService, users::UserService};
+use services::{
+    jwt::JwtService,
+    token::TokenService,
+    users::UserService,
+    email::EmailService,           // ✅ new
+    verification::VerificationService, // ✅ new
+};
 use sqlx::postgres::PgPoolOptions;
 use state::AppState;
 use tower_http::cors::CorsLayer;
@@ -83,17 +91,22 @@ async fn main() -> anyhow::Result<()> {
     let user_service = UserService::new(db_pool.clone());
     let token_service = TokenService::new(db_pool.clone(), redis_conn, config.clone());
 
+    // ✅ New email & verification services
+    let email_service = EmailService::new(&config.clone())?;
+    let verification_service = VerificationService::new(db_pool.clone(), config.clone());
+
     // Create application state
     let app_state = AppState {
         config: config.clone(),
         jwt_service,
         token_service,
         user_service,
+        email_service,          // ✅ added
+        verification_service,   // ✅ added
     };
 
     // Environment-specific CORS configuration
     let cors = if config.is_production() {
-        // Strict CORS for production
         tracing::info!("Configuring strict CORS for production");
         CorsLayer::new()
             .allow_origin(config.frontend_url.parse::<axum::http::HeaderValue>()?)
@@ -101,7 +114,6 @@ async fn main() -> anyhow::Result<()> {
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
             .allow_credentials(true)
     } else {
-        // More permissive CORS for development
         tracing::info!("Configuring permissive CORS for development");
         CorsLayer::new()
             .allow_origin(config.frontend_url.parse::<axum::http::HeaderValue>()?)
@@ -119,7 +131,6 @@ async fn main() -> anyhow::Result<()> {
     // Add development-specific middleware
     if config.is_development() {
         tracing::info!("Adding development-specific middleware");
-        // In development, you might want to add additional debugging layers
         app = app.layer(
             tower_http::trace::TraceLayer::new_for_http()
                 .make_span_with(tower_http::trace::DefaultMakeSpan::new()
@@ -132,9 +143,8 @@ async fn main() -> anyhow::Result<()> {
     // Start server
     let addr = config.server_address();
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-
     tracing::info!("Server listening on {}", addr);
-    
+
     if config.is_production() {
         tracing::warn!("Running in PRODUCTION mode - ensure all security measures are in place");
     } else {
@@ -148,7 +158,6 @@ async fn main() -> anyhow::Result<()> {
         config.refresh_token_expiry
     );
 
-    // Use is_development for additional startup info
     if config.is_development() {
         tracing::info!("Development tips:");
         tracing::info!("  - Check logs for detailed request/response information");
@@ -157,7 +166,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     axum::serve(listener, app).await?;
-
     Ok(())
 }
 
