@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{AppError, Result};
 use lettre::message::{Message, MultiPart, SinglePart};
-use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{SmtpTransport, Transport};
 
 #[derive(Clone)]
@@ -18,26 +18,34 @@ impl EmailService {
             config.smtp_password.clone(),
         );
 
-        // ✅ Automatically choose the right transport depending on port
-        let mailer = if config.smtp_port == 2525 {
-            // Mailtrap development port (no TLS)
-            tracing::info!("Using non-TLS connection on port 2525 (Mailtrap dev mode)");
-            SmtpTransport::builder_dangerous(&config.smtp_host)
+        tracing::info!(
+            "Initializing SMTP client (host: {}, port: {})",
+            config.smtp_host,
+            config.smtp_port
+        );
+
+        // Detect correct security mode
+        let mailer = if config.smtp_port == 465 {
+            // Mailtrap Live → implicit SSL
+            tracing::info!("Using implicit TLS (SSL) connection on port 465");
+            SmtpTransport::relay(&config.smtp_host)
+                .map_err(|e| {
+                    AppError::InternalServerError(format!("SMTP relay creation failed: {:?}", e))
+                })?
                 .port(config.smtp_port)
                 .credentials(creds)
+                .authentication(vec![Mechanism::Plain, Mechanism::Login])
                 .build()
         } else {
-            // Default to STARTTLS (Mailtrap on port 587)
+            // Default → STARTTLS (e.g., Mailtrap send.smtp.mailtrap.io)
             tracing::info!("Using STARTTLS on port {}", config.smtp_port);
             SmtpTransport::relay(&config.smtp_host)
                 .map_err(|e| {
-                    tracing::error!("SMTP relay creation failed: {:?}", e);
-                    AppError::InternalServerError(format!(
-                        "SMTP relay creation failed: {:?}",
-                        e
-                    ))
+                    AppError::InternalServerError(format!("SMTP relay creation failed: {:?}", e))
                 })?
+                .port(config.smtp_port)
                 .credentials(creds)
+                .authentication(vec![Mechanism::Plain, Mechanism::Login])
                 .build()
         };
 
@@ -51,7 +59,7 @@ impl EmailService {
     pub async fn send_verification_email(&self, to: &str, code: &str) -> Result<()> {
         let subject = "Verify Your Email Address";
         let body_text = format!(
-            "Welcome!\n\nUse the following code to verify your email address:\n\n{}\n\nIf you didn’t create an account, ignore this message.",
+            "Welcome!\n\nUse this code to verify your email address:\n\n{}\n\nIf you didn’t create an account, ignore this message.",
             code
         );
         let body_html = format!(
@@ -74,18 +82,17 @@ impl EmailService {
                     .singlepart(SinglePart::plain(body_text))
                     .singlepart(SinglePart::html(body_html)),
             )
-            .map_err(|e| {
-                AppError::InternalServerError(format!("Failed to build email: {}", e))
-            })?;
+            .map_err(|e| AppError::InternalServerError(format!("Failed to build email: {}", e)))?;
 
-        // ✅ Prevent blocking in async runtime
         let mailer = self.mailer.clone();
+        let to_clone = to.to_string();
+
         tokio::task::spawn_blocking(move || mailer.send(&email))
             .await
             .map_err(|e| AppError::InternalServerError(format!("Tokio join error: {}", e)))?
             .map_err(|e| AppError::InternalServerError(format!("SMTP send error: {}", e)))?;
 
-        tracing::info!("Verification email sent successfully to {}", to);
+        tracing::info!("Verification email sent successfully to {}", to_clone);
         Ok(())
     }
 }
