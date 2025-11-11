@@ -38,6 +38,23 @@ pub enum Environment {
     Production,
 }
 
+impl Environment {
+    pub fn is_production(&self) -> bool {
+        matches!(self, Environment::Production)
+    }
+
+    pub fn is_development(&self) -> bool {
+        matches!(self, Environment::Development)
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Environment::Development => "development",
+            Environment::Production => "production",
+        }
+    }
+}
+
 impl Config {
     pub fn from_env() -> Result<Self, anyhow::Error> {
         dotenvy::dotenv().ok();
@@ -96,11 +113,11 @@ impl Config {
     }
 
     pub fn is_production(&self) -> bool {
-        self.environment == Environment::Production
+        self.environment.is_production()
     }
 
     pub fn is_development(&self) -> bool {
-        self.environment == Environment::Development
+        self.environment.is_development()
     }
 
     pub fn server_address(&self) -> String {
@@ -116,15 +133,6 @@ impl Config {
 
     pub fn debug_enabled(&self) -> bool {
         self.is_development()
-    }
-}
-
-impl Environment {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Environment::Development => "development",
-            Environment::Production => "production",
-        }
     }
 }
 

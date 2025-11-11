@@ -18,6 +18,8 @@ pub struct User {
     pub email_verified: bool,
 }
 
+// These fields are used by sqlx for database mapping but not directly accessed in code
+#[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 pub struct RefreshToken {
     pub id: Uuid,
@@ -97,14 +99,15 @@ pub struct RefreshTokenClaims {
     pub aud: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct LogoutRequest {
-    pub access_token: String,
     pub refresh_token: String,
     #[serde(default)]
     pub logout_all: bool,
@@ -116,7 +119,8 @@ pub struct LogoutResponse {
     pub sessions_revoked: u64,
 }
 
-// Session Management
+// Session Management - Feature to be implemented
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ActiveSession {
     pub token_id: Uuid,
@@ -127,6 +131,7 @@ pub struct ActiveSession {
     pub is_current: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ActiveSessionsResponse {
     pub sessions: Vec<ActiveSession>,
@@ -134,6 +139,7 @@ pub struct ActiveSessionsResponse {
     pub total_sessions: usize,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct CheckSessionsRequest {
     pub access_token: String,
@@ -153,4 +159,19 @@ pub struct ResendCodeRequest {
 #[derive(Debug, Serialize)]
 pub struct MessageResponse {
     pub message: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ForgotPasswordRequest {
+    #[validate(email(message = "Invalid email address"))]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ResetPasswordRequest {
+    #[validate(email(message = "Invalid email address"))]
+    pub email: String,
+    pub code: String,
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    pub new_password: String,
 }

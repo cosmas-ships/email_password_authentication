@@ -11,10 +11,11 @@ mod services {
     pub mod password;
     pub mod token;
     pub mod users;
-    pub mod email;         // ✅ Added for email sending
-    pub mod verification;  // ✅ Added for email verification logic
+    pub mod email;
+    pub mod verification;
 }
 mod state;
+mod tasks;
 
 use config::Config;
 use redis::aio::ConnectionManager;
@@ -23,8 +24,8 @@ use services::{
     jwt::JwtService,
     token::TokenService,
     users::UserService,
-    email::EmailService,           // ✅ new
-    verification::VerificationService, // ✅ new
+    email::EmailService,
+    verification::VerificationService,
 };
 use sqlx::postgres::PgPoolOptions;
 use state::AppState;
@@ -91,9 +92,13 @@ async fn main() -> anyhow::Result<()> {
     let user_service = UserService::new(db_pool.clone());
     let token_service = TokenService::new(db_pool.clone(), redis_conn, config.clone());
 
-    // ✅ New email & verification services
+    // New email & verification services
     let email_service = EmailService::new(&config.clone())?;
     let verification_service = VerificationService::new(db_pool.clone(), config.clone());
+
+    // Start background cleanup task - ADD THIS SECTION
+    tasks::cleanup_expired_tokens::start_token_cleanup_task(token_service.clone());
+    tracing::info!("Background token cleanup task initialized");
 
     // Create application state
     let app_state = AppState {
@@ -101,8 +106,8 @@ async fn main() -> anyhow::Result<()> {
         jwt_service,
         token_service,
         user_service,
-        email_service,          // ✅ added
-        verification_service,   // ✅ added
+        email_service,
+        verification_service,
     };
 
     // Environment-specific CORS configuration
@@ -163,6 +168,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("  - Check logs for detailed request/response information");
         tracing::info!("  - CORS is configured permissively for local testing");
         tracing::info!("  - Database pool size: {}", max_connections);
+        tracing::info!("  - Token cleanup runs every hour in background");  // Add this line
     }
 
     axum::serve(listener, app).await?;

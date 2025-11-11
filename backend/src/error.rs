@@ -8,21 +8,19 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    // ===== Existing errors =====
+    // ===== Database & Cache errors =====
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
     #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
 
+    // ===== Authentication & Authorization errors =====
     #[error("Invalid credentials")]
     InvalidCredentials,
 
-    #[error("User already exists")]
-    UserAlreadyExists,
-
-    #[error("User not found")]
-    UserNotFound,
+    #[error("Unauthorized")]
+    Unauthorized,
 
     #[error("Invalid token")]
     InvalidToken,
@@ -33,23 +31,17 @@ pub enum AppError {
     #[error("Token revoked")]
     TokenRevoked,
 
-    #[error("Unauthorized")]
-    Unauthorized,
+    #[error("Missing refresh token")]
+    MissingRefreshToken,
 
-    #[error("Validation error: {0}")]
-    Validation(String),
+    // ===== User errors =====
+    #[error("User already exists")]
+    UserAlreadyExists,
 
-    // ✅ Updated to include message
-    #[error("Internal server error: {0}")]
-    InternalServerError(String),
+    #[error("User not found")]
+    UserNotFound,
 
-    #[error("Password hashing error")]
-    PasswordHashError,
-
-    #[error("JWT error: {0}")]
-    JwtError(String),
-
-    // ===== New email verification errors =====
+    // ===== Email verification errors =====
     #[error("Invalid verification code")]
     InvalidVerificationCode,
 
@@ -67,12 +59,29 @@ pub enum AppError {
 
     #[error("Failed to send email")]
     EmailSendFailed,
+
+    // ===== Validation & Request errors =====
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
+    // ===== Internal errors =====
+    #[error("Internal server error: {0}")]
+    InternalServerError(String),
+
+    #[error("Password hashing error")]
+    PasswordHashError,
+
+    #[error("JWT error: {0}")]
+    JwtError(String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            // ===== Existing errors =====
+            // ===== Database & Cache errors =====
             AppError::Database(ref e) => {
                 tracing::error!("Database error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
@@ -81,14 +90,32 @@ impl IntoResponse for AppError {
                 tracing::error!("Redis error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
             }
+
+            // ===== Authentication & Authorization errors =====
             AppError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "Invalid credentials"),
-            AppError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
-            AppError::UserNotFound => (StatusCode::NOT_FOUND, "User not found"),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
             AppError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token"),
             AppError::TokenExpired => (StatusCode::UNAUTHORIZED, "Token expired"),
             AppError::TokenRevoked => (StatusCode::UNAUTHORIZED, "Token revoked"),
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
+            AppError::MissingRefreshToken => (StatusCode::UNAUTHORIZED, "Missing refresh token"),
+
+            // ===== User errors =====
+            AppError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
+            AppError::UserNotFound => (StatusCode::NOT_FOUND, "User not found"),
+
+            // ===== Email verification errors =====
+            AppError::InvalidVerificationCode => (StatusCode::BAD_REQUEST, "Invalid verification code"),
+            AppError::VerificationCodeExpired => (StatusCode::BAD_REQUEST, "Verification code has expired"),
+            AppError::VerificationCodeAlreadyUsed => (StatusCode::BAD_REQUEST, "Verification code already used"),
+            AppError::EmailNotVerified => (StatusCode::FORBIDDEN, "Email not verified"),
+            AppError::EmailAlreadyVerified => (StatusCode::BAD_REQUEST, "Email already verified"),
+            AppError::EmailSendFailed => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email"),
+
+            // ===== Validation & Request errors =====
             AppError::Validation(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
+            AppError::BadRequest(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
+
+            // ===== Internal errors =====
             AppError::InternalServerError(ref msg) => {
                 tracing::error!("Internal server error: {}", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
@@ -100,14 +127,6 @@ impl IntoResponse for AppError {
                 tracing::error!("JWT error: {:?}", e);
                 (StatusCode::UNAUTHORIZED, "Invalid token")
             }
-
-            // ===== New email verification errors =====
-            AppError::InvalidVerificationCode => (StatusCode::BAD_REQUEST, "Invalid verification code"),
-            AppError::VerificationCodeExpired => (StatusCode::BAD_REQUEST, "Verification code has expired"),
-            AppError::VerificationCodeAlreadyUsed => (StatusCode::BAD_REQUEST, "Verification code already used"),
-            AppError::EmailNotVerified => (StatusCode::FORBIDDEN, "Email not verified"),
-            AppError::EmailAlreadyVerified => (StatusCode::BAD_REQUEST, "Email already verified"),
-            AppError::EmailSendFailed => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email"),
         };
 
         let body = Json(json!({ "error": error_message }));

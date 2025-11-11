@@ -12,11 +12,17 @@ pub fn create_router(state: AppState) -> Router {
         .route("/resend-code", post(auth::resend_verification_code))
         .route("/login", post(auth::login))
         .route("/refresh", post(auth::refresh))
-        .route("/logout", post(auth::logout));
+        .route("/logout", post(auth::logout))
+        .route("/forgot-password", post(auth::forgot_password))
+        .route("/reset-password", post(auth::reset_password));
 
     let protected_routes = Router::new()
         .route("/me", get(auth::me))
-        .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
+        .route("/sessions", get(auth::get_active_sessions))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
 
     Router::new()
         .nest("/auth", auth_routes)

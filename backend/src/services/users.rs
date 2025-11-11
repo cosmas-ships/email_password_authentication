@@ -109,4 +109,20 @@ impl UserService {
 
         Ok(())
     }
+
+    pub async fn update_password(&self, user_id: Uuid, new_password_hash: &str) -> Result<()> {
+        sqlx::query!(
+            r#"
+            UPDATE users 
+            SET password_hash = $1, updated_at = NOW()
+            WHERE id = $2
+            "#,
+            new_password_hash,
+            user_id
+        )
+        .execute(&self.db)
+        .await?;
+
+        Ok(())
+    }
 }
